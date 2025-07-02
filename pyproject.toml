@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nascar-fantasy-predictor"
+version = "0.1.0"
+description = "AI-powered tool for NASCAR fantasy league picks"
+authors = [{name = "Kyle Beggs"}]
+dependencies = [
+    "pandas",
+    "numpy",
+    "requests",
+    "beautifulsoup4",
+    "torch",
+    "click",
+    "tqdm",
+    "schedule",
+    "scikit-learn",
+    "joblib",
+]
+requires-python = ">=3.9"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+]
+
+[project.scripts]
+nascar-predictor = "nascar_fantasy_predictor.cli:main"
+
+[tool.black]
+line-length = 88
+target-version = ["py39"]
+
+[tool.isort]
+profile = "black"
