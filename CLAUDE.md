@@ -45,11 +45,11 @@ nascar-predictor status
 
 #### Model Training
 ```bash
-# Train model on historical data
-nascar-predictor train --start-date 2022-01-01 --epochs 100
+# Train model on all available historical data
+nascar-predictor train --epochs 100
 
-# Train with specific model type
-nascar-predictor train --start-date 2022-01-01 --model-type ensemble
+# Train model with default settings (100 epochs)
+nascar-predictor train
 ```
 
 #### Making Predictions
@@ -100,7 +100,7 @@ The system uses a multi-component architecture:
 
 1. **Data Collection**: Scrapes historical race results from Racing-Reference and speed analytics from iFantasyRace
 2. **Feature Engineering**: Creates 25+ features including performance metrics, track history, speed analytics, and momentum indicators
-3. **PyTorch Models**: Three model types available - basic tabular NN, ensemble, and NASCAR-specialized architecture
+3. **PyTorch Models**: Tabular neural network architecture optimized for structured NASCAR data
 4. **Prediction Engine**: Provides point predictions with confidence intervals and lineup optimization
 5. **Incremental Learning**: Updates models with new race data automatically
 

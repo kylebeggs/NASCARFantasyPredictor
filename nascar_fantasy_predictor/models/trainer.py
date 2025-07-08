@@ -14,26 +14,25 @@ from pathlib import Path
 import json
 from datetime import datetime
 
-from .tabular_nn import TabularNN, EnsembleTabularNN, NASCARPredictor
+from .tabular_nn import TabularNN
 
 
-class NASCARModelTrainer:
+class ModelTrainer:
     """Trainer for NASCAR fantasy point prediction models."""
     
-    def __init__(self, model_type: str = "nascar", device: str = None):
+    def __init__(self, device: str = None):
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.model_type = model_type
         self.model = None
         self.scaler = StandardScaler()
         self.feature_columns = None
         self.training_history = []
         
-    def prepare_data(self, df: pd.DataFrame, target_column: str = 'fantasy_points',
+    def prepare_data(self, df: pd.DataFrame, target_column: str = 'finish_position',
                     feature_columns: List[str] = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """Prepare data for training."""
         if feature_columns is None:
             # Exclude non-feature columns
-            exclude_cols = ['driver_id', 'driver_name', 'race_id', 'date', target_column]
+            exclude_cols = ['driver_id', 'driver_name', 'race_id', 'date', target_column, 'fantasy_points']
             feature_columns = [col for col in df.columns if col not in exclude_cols]
         
         self.feature_columns = feature_columns
@@ -52,16 +51,8 @@ class NASCARModelTrainer:
         return X_tensor, y_tensor
     
     def create_model(self, input_dim: int, **kwargs) -> nn.Module:
-        """Create model based on specified type."""
-        if self.model_type == "tabular":
-            model = TabularNN(input_dim, **kwargs)
-        elif self.model_type == "ensemble":
-            model = EnsembleTabularNN(input_dim, **kwargs)
-        elif self.model_type == "nascar":
-            model = NASCARPredictor(input_dim, **kwargs)
-        else:
-            raise ValueError(f"Unknown model type: {self.model_type}")
-        
+        """Create tabular neural network model."""
+        model = TabularNN(input_dim, **kwargs)
         return model.to(self.device)
     
     def train(self, X: torch.Tensor, y: torch.Tensor, 
@@ -243,28 +234,21 @@ class NASCARModelTrainer:
             return predictions.cpu().numpy()
     
     def predict_with_uncertainty(self, X: torch.Tensor) -> Tuple[np.ndarray, np.ndarray]:
-        """Make predictions with uncertainty estimates (for ensemble models)."""
-        if not hasattr(self.model, 'forward_with_uncertainty'):
-            # For non-ensemble models, use dropout for uncertainty estimation
-            self.model.train()  # Enable dropout
-            predictions = []
-            
-            with torch.no_grad():
-                for _ in range(10):  # Monte Carlo sampling
-                    pred = self.model(X)
-                    predictions.append(pred.cpu().numpy())
-            
-            predictions = np.array(predictions)
-            mean_pred = predictions.mean(axis=0)
-            std_pred = predictions.std(axis=0)
-            
-            return mean_pred, std_pred
-        else:
-            # Use ensemble uncertainty
-            self.model.eval()
-            with torch.no_grad():
-                mean_pred, std_pred = self.model.forward_with_uncertainty(X)
-                return mean_pred.cpu().numpy(), std_pred.cpu().numpy()
+        """Make predictions with uncertainty estimates using Monte Carlo dropout."""
+        # Use dropout for uncertainty estimation
+        self.model.train()  # Enable dropout
+        predictions = []
+        
+        with torch.no_grad():
+            for _ in range(10):  # Monte Carlo sampling
+                pred = self.model(X)
+                predictions.append(pred.cpu().numpy())
+        
+        predictions = np.array(predictions)
+        mean_pred = predictions.mean(axis=0)
+        std_pred = predictions.std(axis=0)
+        
+        return mean_pred, std_pred
     
     def evaluate(self, X: torch.Tensor, y: torch.Tensor, metric: str = 'mse') -> float:
         """Evaluate model performance."""
@@ -289,10 +273,17 @@ class NASCARModelTrainer:
         filepath.parent.mkdir(parents=True, exist_ok=True)
         
         # Save model state
+        # Get actual input dimension from model's first layer
+        if hasattr(self.model, 'input_dim'):
+            actual_input_dim = self.model.input_dim
+        elif hasattr(self.model, 'final_network') and len(self.model.final_network) > 0:
+            actual_input_dim = self.model.final_network[0].in_features
+        else:
+            actual_input_dim = len(self.feature_columns) if self.feature_columns else None
+            
         torch.save({
             'model_state_dict': self.model.state_dict(),
-            'model_type': self.model_type,
-            'input_dim': self.model.input_dim if hasattr(self.model, 'input_dim') else None,
+            'input_dim': actual_input_dim,
             'feature_columns': self.feature_columns,
             'device': self.device,
             'training_history': self.training_history
@@ -304,27 +295,45 @@ class NASCARModelTrainer:
         # Save metadata
         metadata = {
             'saved_at': datetime.now().isoformat(),
-            'model_type': self.model_type,
+            'model_type': 'tabular',
             'feature_count': len(self.feature_columns) if self.feature_columns else None,
-            'training_history': self.training_history
+            'training_history': self._convert_to_serializable(self.training_history)
         }
         
         with open(filepath.with_suffix('.json'), 'w') as f:
             json.dump(metadata, f, indent=2)
+    
+    def _convert_to_serializable(self, obj):
+        """Convert numpy types to JSON-serializable types."""
+        import numpy as np
+        
+        if isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, list):
+            return [self._convert_to_serializable(item) for item in obj]
+        elif isinstance(obj, dict):
+            return {key: self._convert_to_serializable(value) for key, value in obj.items()}
+        else:
+            return obj
     
     def load_model(self, filepath: str):
         """Load trained model and scaler."""
         filepath = Path(filepath)
         
         # Load model
-        checkpoint = torch.load(filepath.with_suffix('.pth'), map_location=self.device)
+        checkpoint = torch.load(filepath.with_suffix('.pth'), map_location=self.device, weights_only=False)
         
-        self.model_type = checkpoint['model_type']
         self.feature_columns = checkpoint['feature_columns']
         self.training_history = checkpoint.get('training_history', [])
         
         # Recreate model
-        input_dim = checkpoint.get('input_dim', len(self.feature_columns))
+        input_dim = checkpoint.get('input_dim')
+        if input_dim is None:
+            input_dim = len(self.feature_columns) if self.feature_columns else 30
         self.model = self.create_model(input_dim)
         self.model.load_state_dict(checkpoint['model_state_dict'])
         

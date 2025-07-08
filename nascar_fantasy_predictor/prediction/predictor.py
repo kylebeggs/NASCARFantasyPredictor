@@ -1,37 +1,30 @@
-"""Main prediction engine for NASCAR fantasy points."""
+"""CSV-based prediction engine for NASCAR fantasy points."""
 
 import torch
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
-import sqlite3
 from pathlib import Path
 
-from ..data.database import DatabaseManager
+from ..data.csv_manager import CSVDataManager
 from ..features.feature_engineering import FeatureEngineer
-from ..features.feature_processor import FeatureProcessor
 from ..features.fantasy_points import FantasyPointsCalculator
-from ..models.trainer import NASCARModelTrainer
+from ..models.trainer import ModelTrainer
 
 
 class NASCARPredictor:
     """Main prediction engine for NASCAR fantasy points."""
     
-    def __init__(self, db_path: str = None, model_path: str = None):
-        self.db_manager = DatabaseManager(db_path)
-        self.feature_engineer = None
-        self.feature_processor = FeatureProcessor()
-        self.trainer = NASCARModelTrainer()
+    def __init__(self, data_dir: str = ".", model_path: str = None):
+        self.data_manager = CSVDataManager(data_dir)
+        self.feature_engineer = FeatureEngineer(self.data_manager)
+        self.trainer = ModelTrainer()
         self.fantasy_calculator = FantasyPointsCalculator()
         self.model_path = model_path
         
-        # Initialize database connection
-        self.db_connection = self.db_manager.get_connection()
-        self.feature_engineer = FeatureEngineer(self.db_connection)
-        
         # Load model if path provided
-        if model_path and Path(model_path).exists():
+        if model_path and Path(model_path + '.pth').exists():
             self.load_model(model_path)
     
     def predict_next_race(self, race_date: str, num_predictions: int = None) -> pd.DataFrame:
@@ -45,11 +38,15 @@ class NASCARPredictor:
         if features_df.empty:
             raise ValueError(f"No driver data available for race on {race_date}")
         
-        # Prepare features for prediction
-        feature_columns = [col for col in features_df.columns 
-                          if col not in ['driver_id', 'driver_name']]
+        # Prepare features for prediction using the same logic as training
+        if self.trainer.feature_columns is None:
+            raise ValueError("Model was not trained with feature columns metadata. Retrain the model.")
         
-        X = features_df[feature_columns].fillna(0).values
+        # Use the feature processor to ensure consistent feature preparation
+        processed_df = self.feature_engineer.prepare_for_training(features_df, target_column=None)
+        
+        # Filter to only the features that were used during training
+        X = processed_df[self.trainer.feature_columns].fillna(0).values
         X_scaled = self.trainer.scaler.transform(X)
         X_tensor = torch.FloatTensor(X_scaled).to(self.trainer.device)
         
@@ -58,9 +55,8 @@ class NASCARPredictor:
         
         # Create results dataframe
         results = pd.DataFrame({
-            'driver_id': features_df['driver_id'],
             'driver_name': features_df['driver_name'],
-            'predicted_fantasy_points': predictions,
+            'predicted_finish_position': predictions,
             'prediction_uncertainty': uncertainties,
             'confidence_lower': predictions - 1.96 * uncertainties,
             'confidence_upper': predictions + 1.96 * uncertainties
@@ -69,8 +65,8 @@ class NASCARPredictor:
         # Add current driver info
         results = self._add_driver_context(results)
         
-        # Sort by predicted points (descending)
-        results = results.sort_values('predicted_fantasy_points', ascending=False)
+        # Sort by predicted finish position (ascending - lower position is better)
+        results = results.sort_values('predicted_finish_position', ascending=True)
         
         # Limit results if requested
         if num_predictions:
@@ -80,28 +76,27 @@ class NASCARPredictor:
     
     def get_driver_prediction(self, driver_name: str, race_date: str) -> Dict:
         """Get detailed prediction for a specific driver."""
-        # Get driver ID
-        cursor = self.db_connection.execute(
-            "SELECT id FROM drivers WHERE name = ?", (driver_name,)
-        )
-        result = cursor.fetchone()
-        
-        if not result:
-            raise ValueError(f"Driver '{driver_name}' not found in database")
-        
-        driver_id = result[0]
+        # Check if driver exists in data
+        driver_data = self.data_manager.get_driver_data(driver_name)
+        if driver_data.empty:
+            raise ValueError(f"Driver '{driver_name}' not found in data")
         
         # Create features for this driver
         driver_features = self.feature_engineer._create_driver_features(
-            driver_id, race_date, lookback_races=10
+            driver_name, race_date, lookback_races=10
         )
         
-        # Prepare for prediction
+        # Prepare for prediction using the same logic as training
         features_df = pd.DataFrame([driver_features])
-        feature_columns = [col for col in features_df.columns 
-                          if col not in ['driver_id', 'driver_name']]
         
-        X = features_df[feature_columns].fillna(0).values
+        if self.trainer.feature_columns is None:
+            raise ValueError("Model was not trained with feature columns metadata. Retrain the model.")
+        
+        # Use the feature processor to ensure consistent feature preparation
+        processed_df = self.feature_engineer.prepare_for_training(features_df, target_column=None)
+        
+        # Filter to only the features that were used during training
+        X = processed_df[self.trainer.feature_columns].fillna(0).values
         X_scaled = self.trainer.scaler.transform(X)
         X_tensor = torch.FloatTensor(X_scaled).to(self.trainer.device)
         
@@ -109,21 +104,20 @@ class NASCARPredictor:
         prediction, uncertainty = self.trainer.predict_with_uncertainty(X_tensor)
         
         # Get historical context
-        recent_results = self.feature_engineer._get_recent_results(
-            driver_id, race_date, 5
+        recent_results = self.data_manager.get_driver_recent_results(
+            driver_name, race_date, 5
         )
         
         return {
             'driver_name': driver_name,
-            'predicted_fantasy_points': float(prediction[0]),
+            'predicted_finish_position': float(prediction[0]),
             'prediction_uncertainty': float(uncertainty[0]),
             'confidence_interval': [
                 float(prediction[0] - 1.96 * uncertainty[0]),
                 float(prediction[0] + 1.96 * uncertainty[0])
             ],
             'recent_performance': {
-                'avg_fantasy_points': np.mean([r['fantasy_points'] for r in recent_results if r['fantasy_points']]),
-                'avg_finish': np.mean([r['finish_position'] for r in recent_results if r['finish_position']]),
+                'avg_finish': recent_results['finish_position'].mean() if not recent_results.empty else None,
                 'races_count': len(recent_results)
             },
             'feature_summary': {
@@ -133,44 +127,11 @@ class NASCARPredictor:
             }
         }
     
-    def predict_with_lineup_optimization(self, race_date: str, budget: float = 50000,
-                                       salary_info: Dict[str, float] = None) -> Dict:
-        """Predict with lineup optimization for DFS play."""
-        predictions = self.predict_next_race(race_date)
-        
-        if salary_info is None:
-            # Use simple salary estimation based on recent performance
-            salary_info = self._estimate_salaries(predictions)
-        
-        # Add salary information
-        predictions['salary'] = predictions['driver_name'].map(salary_info).fillna(8000)
-        predictions['value_score'] = predictions['predicted_fantasy_points'] / predictions['salary'] * 1000
-        
-        # Optimize lineup (simple greedy approach)
-        lineup = self._optimize_lineup(predictions, budget)
-        
-        return {
-            'predictions': predictions.to_dict('records'),
-            'optimal_lineup': lineup,
-            'lineup_stats': {
-                'total_salary': sum(driver['salary'] for driver in lineup),
-                'projected_points': sum(driver['predicted_fantasy_points'] for driver in lineup),
-                'remaining_budget': budget - sum(driver['salary'] for driver in lineup)
-            }
-        }
     
     def evaluate_predictions(self, race_date: str) -> Dict:
         """Evaluate prediction accuracy against actual results."""
         # Get actual race results
-        query = """
-        SELECT rr.driver_id, d.name as driver_name, rr.fantasy_points
-        FROM race_results rr
-        JOIN drivers d ON rr.driver_id = d.id
-        JOIN races r ON rr.race_id = r.id
-        WHERE r.date = ?
-        """
-        
-        actual_results = pd.read_sql_query(query, self.db_connection, params=(race_date,))
+        actual_results = self.data_manager.get_race_results(race_date)
         
         if actual_results.empty:
             raise ValueError(f"No actual results found for race on {race_date}")
@@ -180,6 +141,14 @@ class NASCARPredictor:
             predictions = self.predict_next_race(race_date)
         except:
             return {"error": "Could not generate predictions for this race"}
+        
+        # Convert predicted finish position to fantasy points for evaluation
+        # Simple conversion: better finish = more fantasy points
+        predictions['predicted_fantasy_points'] = 43 - predictions['predicted_finish_position']
+        
+        # Calculate actual fantasy points if not present
+        if 'fantasy_points' not in actual_results.columns:
+            actual_results['fantasy_points'] = 43 - actual_results['finish_position']
         
         # Merge predictions with actual results
         merged = pd.merge(
@@ -212,31 +181,60 @@ class NASCARPredictor:
             'worst_prediction': merged.loc[merged['predicted_fantasy_points'].idxmin()]['driver_name']
         }
     
-    def train_model(self, start_date: str, end_date: str = None, 
-                   model_type: str = "nascar", **training_kwargs):
-        """Train the prediction model on historical data."""
-        if end_date is None:
-            end_date = datetime.now().strftime("%Y-%m-%d")
-        
-        # Get training data
-        training_data = self._get_training_data(start_date, end_date)
+    def train_model(self, **training_kwargs):
+        """Train the prediction model on all available historical data."""
+        # Get all available training data
+        training_data = self._get_all_training_data()
         
         if training_data.empty:
-            raise ValueError("No training data available for the specified date range")
+            raise ValueError("No training data available")
         
-        print(f"Training on {len(training_data)} samples from {start_date} to {end_date}")
+        # Get data range for logging
+        data_stats = self.data_manager.get_data_stats()
+        date_range = data_stats.get('date_range', 'unknown')
+        
+        if isinstance(date_range, dict):
+            start_date = date_range.get('earliest', 'unknown')
+            end_date = date_range.get('latest', 'unknown') 
+            date_range_str = f"{start_date} to {end_date}"
+        else:
+            date_range_str = str(date_range)
+        
+        print(f"Training on {len(training_data)} samples from {date_range_str}")
         
         # Clean and prepare data using feature processor
-        cleaned_data = self.feature_processor.prepare_features_for_training(training_data, 'fantasy_points')
+        cleaned_data = self.feature_engineer.prepare_for_training(training_data, 'finish_position')
         
-        print(f"After cleaning: {len(cleaned_data)} samples with {len(self.feature_processor.get_feature_names())} features")
+        print(f"After cleaning: {len(cleaned_data)} samples with {len(self.feature_engineer.get_feature_names())} features")
         
         # Prepare data for model
-        self.trainer = NASCARModelTrainer(model_type=model_type)
-        X, y = self.trainer.prepare_data(cleaned_data, 'fantasy_points')
+        self.trainer = ModelTrainer()
+        
+        # Use the feature processor's feature names for consistency
+        feature_names = self.feature_engineer.get_feature_names()
+        X, y = self.trainer.prepare_data(cleaned_data, target_column='finish_position', feature_columns=feature_names)
         
         # Train model
         training_result = self.trainer.train(X, y, **training_kwargs)
+        
+        # Log training session
+        if isinstance(date_range, dict):
+            start_date_log = date_range.get('earliest', 'unknown')
+            end_date_log = date_range.get('latest', 'unknown')
+        else:
+            start_date_log = date_range_str.split(' to ')[0] if ' to ' in date_range_str else 'unknown'
+            end_date_log = date_range_str.split(' to ')[1] if ' to ' in date_range_str else 'unknown'
+            
+        self.data_manager.log_model_training(
+            model_version=f"tabular_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            train_data_start=start_date_log,
+            train_data_end=end_date_log,
+            model_accuracy=training_result['val_mae'],
+            model_path=self.model_path or "auto_saved",
+            epochs_trained=training_result['epochs_trained'],
+            train_mae=training_result['train_mae'],
+            val_mae=training_result['val_mae']
+        )
         
         print(f"Training completed. Final validation MAE: {training_result['val_mae']:.2f}")
         
@@ -257,7 +255,7 @@ class NASCARPredictor:
         print(f"Updating model with {len(new_data)} new samples since {since_date}")
         
         # Prepare new data
-        X_new, y_new = self.trainer.prepare_data(new_data, 'fantasy_points')
+        X_new, y_new = self.trainer.prepare_data(new_data, 'finish_position')
         
         # Incremental training
         self.trainer.incremental_train(X_new, y_new)
@@ -278,104 +276,86 @@ class NASCARPredictor:
         self.model_path = filepath
         print(f"Model loaded from {filepath}")
     
+    def _get_all_training_data(self) -> pd.DataFrame:
+        """Get all available training data from CSV files."""
+        # Get all available race data
+        all_data = self.data_manager.load_race_data()
+        
+        if all_data.empty:
+            return pd.DataFrame()
+        
+        # Get date range
+        all_data['date'] = pd.to_datetime(all_data['date'])
+        min_date = all_data['date'].min().strftime('%Y-%m-%d')
+        max_date = all_data['date'].max().strftime('%Y-%m-%d')
+        
+        return self._get_training_data(min_date, max_date)
+    
     def _get_training_data(self, start_date: str, end_date: str = None) -> pd.DataFrame:
-        """Get training data from database."""
+        """Get training data from CSV files."""
         if end_date is None:
             end_date = datetime.now().strftime("%Y-%m-%d")
         
-        # Get all races in date range
-        race_query = """
-        SELECT id, date, track_name
-        FROM races
-        WHERE date >= ? AND date <= ?
-        ORDER BY date
-        """
+        # Get all race data in date range
+        race_data = self.data_manager.get_training_data(start_date, end_date)
         
-        races = pd.read_sql_query(race_query, self.db_connection, params=(start_date, end_date))
+        if race_data.empty:
+            return pd.DataFrame()
+        
+        # Get unique race dates
+        race_dates = sorted(race_data['date'].unique())
         
         all_training_data = []
         
-        for _, race in races.iterrows():
+        for race_date in race_dates:
             try:
                 # Create features for this race date
-                features = self.feature_engineer.create_features(race['date'])
+                features = self.feature_engineer.create_features(race_date)
                 
-                # Get actual fantasy points for this race
-                results_query = """
-                SELECT rr.driver_id, rr.fantasy_points
-                FROM race_results rr
-                WHERE rr.race_id = ? AND rr.fantasy_points IS NOT NULL
-                """
+                # Get actual results for this race
+                actual_results = race_data[race_data['date'] == race_date]
                 
-                actual_results = pd.read_sql_query(
-                    results_query, self.db_connection, params=(race['id'],)
-                )
+                # Select columns that exist
+                result_columns = ['driver_name', 'finish_position']
+                if 'fantasy_points' in actual_results.columns:
+                    result_columns.append('fantasy_points')
                 
                 # Merge features with actual results
-                race_data = pd.merge(features, actual_results, on='driver_id', how='inner')
+                merged_data = pd.merge(
+                    features, 
+                    actual_results[result_columns], 
+                    on='driver_name', 
+                    how='inner'
+                )
                 
-                if not race_data.empty:
-                    all_training_data.append(race_data)
+                if not merged_data.empty:
+                    all_training_data.append(merged_data)
                     
             except Exception as e:
-                print(f"Error processing race {race['date']}: {e}")
+                print(f"Error processing race {race_date}: {e}")
                 continue
         
         return pd.concat(all_training_data, ignore_index=True) if all_training_data else pd.DataFrame()
     
     def _add_driver_context(self, predictions: pd.DataFrame) -> pd.DataFrame:
         """Add current driver context information."""
-        driver_info_query = """
-        SELECT id, car_number, team, manufacturer
-        FROM drivers
-        WHERE id IN ({})
-        """.format(','.join('?' * len(predictions)))
+        # Get driver info from recent data
+        all_data = self.data_manager.load_race_data()
         
-        driver_info = pd.read_sql_query(
-            driver_info_query, self.db_connection, 
-            params=predictions['driver_id'].tolist()
-        )
+        if all_data.empty:
+            return predictions
         
-        return pd.merge(predictions, driver_info, left_on='driver_id', right_on='id', how='left')
+        # Get most recent info for each driver
+        driver_info = all_data.groupby('driver_name').last().reset_index()
+        driver_info = driver_info[['driver_name', 'car_number', 'team', 'manufacturer']]
+        
+        return pd.merge(predictions, driver_info, on='driver_name', how='left')
     
-    def _estimate_salaries(self, predictions: pd.DataFrame) -> Dict[str, float]:
-        """Estimate DFS salaries based on recent performance."""
-        # Simple salary estimation (would be replaced with actual DFS salaries)
-        base_salary = 8000
-        salary_range = 4000
-        
-        max_points = predictions['predicted_fantasy_points'].max()
-        min_points = predictions['predicted_fantasy_points'].min()
-        
-        salaries = {}
-        for _, row in predictions.iterrows():
-            normalized_points = (row['predicted_fantasy_points'] - min_points) / (max_points - min_points)
-            salary = base_salary + (normalized_points * salary_range)
-            salaries[row['driver_name']] = int(salary / 100) * 100  # Round to nearest 100
-        
-        return salaries
     
-    def _optimize_lineup(self, predictions: pd.DataFrame, budget: float) -> List[Dict]:
-        """Simple greedy lineup optimization."""
-        # Sort by value score (points per dollar)
-        sorted_drivers = predictions.sort_values('value_score', ascending=False)
-        
-        lineup = []
-        remaining_budget = budget
-        
-        for _, driver in sorted_drivers.iterrows():
-            if driver['salary'] <= remaining_budget and len(lineup) < 6:  # Standard 6-driver lineup
-                lineup.append({
-                    'driver_name': driver['driver_name'],
-                    'predicted_fantasy_points': driver['predicted_fantasy_points'],
-                    'salary': driver['salary'],
-                    'value_score': driver['value_score']
-                })
-                remaining_budget -= driver['salary']
-        
-        return lineup
+    def get_data_stats(self) -> Dict:
+        """Get statistics about the CSV data."""
+        return self.data_manager.get_data_stats()
     
-    def __del__(self):
-        """Clean up database connection."""
-        if hasattr(self, 'db_connection'):
-            self.db_connection.close()
+    def migrate_existing_data(self, nascar_file: str = None) -> int:
+        """Migrate existing CSV files to the master data format."""
+        return self.data_manager.migrate_existing_csvs(nascar_file)
