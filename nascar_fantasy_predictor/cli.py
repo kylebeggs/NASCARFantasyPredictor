@@ -10,6 +10,7 @@ from .data.csv_manager import CSVDataManager
 from .data.nascar_official_scraper import NASCAROfficialScraper
 from .data.mock_data import create_mock_data_fallback
 from .data.csv_importer import CSVDataImporter
+from .data.lapraptor_scraper import LapRaptorScraper
 from .prediction.predictor import NASCARPredictor
 
 
@@ -333,6 +334,118 @@ def migrate(nascar_file):
         
     except Exception as e:
         click.echo(f"Error during migration: {e}")
+
+
+@cli.command()
+@click.option('--year', default=2025, help='Year to update data for')
+@click.option('--auto-retrain', is_flag=True, help='Automatically retrain model after update')
+@click.option('--scrape-all', is_flag=True, help='Scrape all available races for the year')
+def update_weekly(year, auto_retrain, scrape_all):
+    """Update database with latest race data from LapRaptor.com."""
+    click.echo(f"Updating {year} race data from LapRaptor.com...")
+    
+    try:
+        # Initialize scraper and data manager
+        scraper = LapRaptorScraper()
+        csv_manager = CSVDataManager()
+        
+        # Get current data stats
+        stats = csv_manager.get_data_stats()
+        if 'error' not in stats:
+            click.echo(f"Current data: {stats['total_races']} races, latest: {stats['date_range']['latest']}")
+        
+        # Scrape 2025 data
+        if scrape_all:
+            click.echo("Scraping all available races...")
+            new_data = scraper.scrape_all_2025_data()
+        else:
+            click.echo("Scraping completed races...")
+            completed_races = scraper.get_completed_2025_races()
+            click.echo(f"Found {len(completed_races)} completed races")
+            
+            all_race_data = []
+            for race in completed_races:
+                race_data = scraper.get_race_results(race['race_id'])
+                if race_data is not None and not race_data.empty:
+                    standardized_data = scraper.standardize_race_data(race_data)
+                    all_race_data.append(standardized_data)
+            
+            if all_race_data:
+                new_data = pd.concat(all_race_data, ignore_index=True)
+            else:
+                new_data = pd.DataFrame()
+        
+        if new_data.empty:
+            click.echo("No new data found.")
+            return
+        
+        # Add new data to database
+        click.echo(f"Adding {len(new_data)} new records to database...")
+        csv_manager.add_race_results(new_data)
+        
+        # Show updated stats
+        updated_stats = csv_manager.get_data_stats()
+        if 'error' not in updated_stats:
+            click.echo(f"Updated data: {updated_stats['total_races']} races, latest: {updated_stats['date_range']['latest']}")
+        
+        # Auto-retrain if requested
+        if auto_retrain:
+            click.echo("Retraining model with updated data...")
+            predictor = NASCARPredictor()
+            
+            training_result = predictor.train_model(epochs=100, validation_split=0.2)
+            
+            click.echo(f"Retraining completed!")
+            click.echo(f"Final validation MAE: {training_result['val_mae']:.2f}")
+            click.echo(f"Training MAE: {training_result['train_mae']:.2f}")
+            click.echo(f"Epochs trained: {training_result['epochs_trained']}")
+            
+            # Save retrained model
+            output_path = f"models/nascar_model_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+            predictor.save_model(output_path)
+            click.echo(f"Model saved to {output_path}")
+        
+        click.echo("Weekly update completed successfully!")
+        
+    except Exception as e:
+        click.echo(f"Error during weekly update: {e}")
+
+
+@cli.command()
+@click.option('--year', default=2025, help='Year to fetch data for')
+def fetch_2025_data(year):
+    """Fetch all available 2025 race data from LapRaptor.com."""
+    click.echo(f"Fetching all {year} NASCAR Cup Series data from LapRaptor.com...")
+    
+    try:
+        # Initialize scraper and data manager
+        scraper = LapRaptorScraper()
+        csv_manager = CSVDataManager()
+        
+        # Get all 2025 data
+        new_data = scraper.scrape_all_2025_data()
+        
+        if new_data.empty:
+            click.echo("No data available for 2025.")
+            return
+        
+        # Add to database
+        click.echo(f"Adding {len(new_data)} records to database...")
+        csv_manager.add_race_results(new_data)
+        
+        # Show stats
+        stats = csv_manager.get_data_stats()
+        if 'error' not in stats:
+            click.echo(f"Total data: {stats['total_races']} races")
+            click.echo(f"Date range: {stats['date_range']['earliest']} to {stats['date_range']['latest']}")
+            click.echo(f"Unique drivers: {stats['unique_drivers']}")
+            click.echo(f"Unique tracks: {stats['unique_tracks']}")
+        
+        click.echo("Data fetch completed successfully!")
+        
+    except Exception as e:
+        click.echo(f"Error fetching 2025 data: {e}")
 
 
 def main():

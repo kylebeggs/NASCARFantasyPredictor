@@ -69,6 +69,12 @@ nascar-predictor predict --output predictions.csv
 # Update model with new race data
 nascar-predictor update --since-date 2024-01-01 --model-path models/my_model
 
+# Weekly update with 2025 data from LapRaptor.com
+nascar-predictor update-weekly --auto-retrain
+
+# Fetch all available 2025 race data
+nascar-predictor fetch-2025-data
+
 # Evaluate model accuracy on past race
 nascar-predictor evaluate --race-date 2024-02-25
 ```
