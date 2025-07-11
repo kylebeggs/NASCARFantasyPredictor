@@ -1,6 +1,14 @@
 # 🏁 NASCAR Fantasy Predictor 🤖
 
-> **🎯 Note:** This repository is 99% written by Claude (Anthropic's AI assistant) and represents a collaborative pet project combining my passion for NASCAR 🏎️ with exploring the capabilities of modern AI coding tools ⚡. It demonstrates how AI can rapidly prototype, implement, and iterate on complex data science projects when guided by domain expertise!
+> **⚠️ DISCLAIMER & WARNING ⚠️**  
+> This repository is 99% written by Claude (Anthropic's AI assistant) - I just provided the NASCAR knowledge and said "make it go fast!" 🏎️💨 This is a collaborative experiment in AI-assisted development, which means:
+> 
+> - 🤖 **Claude wrote the code** - Any bugs, questionable design decisions, or "why did they do it that way??" moments should be blamed entirely on the AI, not me!
+> - 🧠 **I provided the NASCAR expertise** - If the predictions are wrong, that's probably my fault for not explaining why Kyle Larson is magic on dirt tracks
+> - 🚀 **This is an experiment** - We're exploring what happens when you combine human domain knowledge with AI coding superpowers
+> - 🎯 **Don't judge my coding skills** - I can barely write a for loop without Stack Overflow, but Claude here can apparently build entire neural networks before breakfast!
+>
+> Consider this a "hold my beer and watch this" moment in AI development! 🍺⚡
 
 ## 🎬 Overview
 
