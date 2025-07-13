@@ -18,6 +18,9 @@ dependencies = [
     "schedule",
     "scikit-learn",
     "joblib",
+    "shap",
+    "matplotlib",
+    "seaborn",
 ]
 requires-python = ">=3.9"
 
@@ -31,7 +34,7 @@ dev = [
 ]
 
 [project.scripts]
-nascar-predictor = "nascar_fantasy_predictor.cli:main"
+nascar-predictor = "nascar_fantasy_predictor.cli.main:main"
 
 [tool.black]
 line-length = 88

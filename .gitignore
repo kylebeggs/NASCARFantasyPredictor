@@ -48,3 +48,12 @@ Thumbs.db
 
 # Jupyter
 .ipynb_checkpoints/
+
+# NASCAR Fantasy Predictor specific
+models/
+*.pth
+backups/
+temp_*
+debug_*
+*.tmp
+qualifying_results_*.csv

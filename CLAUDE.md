@@ -46,43 +46,56 @@ nascar-predictor status
 #### Model Training
 ```bash
 # Train model on all available historical data
-nascar-predictor train --epochs 100
+nascar-predictor train model --epochs 100
 
-# Train model with default settings (100 epochs)
-nascar-predictor train
+# Train model with aggressive parameters for maximum accuracy
+nascar-predictor train aggressive
 ```
 
 #### Making Predictions
 ```bash
-# Predict for next race (auto-detects next Sunday)
-nascar-predictor predict
+# Predict for next race with qualifying results
+nascar-predictor predict race --qualifying-file qualifying_results.csv
 
-# Predict for specific race date
-nascar-predictor predict --race-date 2024-03-10 --num-drivers 15
+# Predict for specific driver
+nascar-predictor predict driver --driver-name "Tyler Reddick" --start-position 5
 
 # Save predictions to file
-nascar-predictor predict --output predictions.csv
+nascar-predictor predict race --qualifying-file qualifying.csv --output predictions.csv
 ```
 
 #### Model Updates
 ```bash
 # Update model with new race data
-nascar-predictor update --since-date 2024-01-01 --model-path models/my_model
+nascar-predictor train update --since-date 2024-01-01 --model-path models/my_model
 
 # Weekly update with 2025 data from LapRaptor.com
-nascar-predictor update-weekly --auto-retrain
+nascar-predictor data update-weekly --auto-retrain
 
 # Fetch all available 2025 race data
-nascar-predictor fetch-2025-data
+nascar-predictor data fetch-2025
 
 # Evaluate model accuracy on past race
-nascar-predictor evaluate --race-date 2024-02-25
+nascar-predictor predict evaluate --race-date 2024-02-25 --qualifying-file qualifying.csv
+
+# Check system status
+nascar-predictor system status
+
+# Analyze feature importance
+nascar-predictor analyze features --output feature_report
 ```
 
 ## Project Structure
 
 - `nascar_fantasy_predictor/` - Main package directory
-  - `cli.py` - Enhanced command line interface with subcommands
+  - `cli/` - Modular command line interface
+    - `main.py` - Main CLI entry point
+    - `commands/` - Command modules organized by functionality
+      - `data_commands.py` - Data management commands
+      - `training_commands.py` - Model training commands  
+      - `prediction_commands.py` - Race prediction commands
+      - `analysis_commands.py` - Model analysis and interpretation
+      - `maintenance_commands.py` - System maintenance utilities
   - `data/` - Data collection and management
     - `database.py` - SQLite database schema and management
     - `racing_reference_scraper.py` - Racing Reference historical data scraper
@@ -96,6 +109,11 @@ nascar-predictor evaluate --race-date 2024-02-25
     - `trainer.py` - Model training and management system
   - `prediction/` - Prediction engine
     - `predictor.py` - Main prediction engine with uncertainty quantification
+  - `interpretation/` - Model explanation and analysis
+    - `feature_importance.py` - Feature importance analysis and SHAP
+  - `utils/` - Utility modules
+    - `logging.py` - Centralized logging configuration
+    - `exceptions.py` - Custom exception classes
 - `tests/` - Test directory
 - `docs/` - Documentation directory
 - `pyproject.toml` - Project configuration with PyTorch dependencies

@@ -15,6 +15,7 @@ import json
 from datetime import datetime
 
 from .tabular_nn import TabularNN
+from ..interpretation.feature_importance import FeatureImportanceAnalyzer
 
 
 class ModelTrainer:
@@ -341,3 +342,106 @@ class ModelTrainer:
         self.scaler = joblib.load(filepath.with_suffix('.scaler'))
         
         print(f"Model loaded successfully from {filepath}")
+    
+    def get_feature_importance(self, X: np.ndarray, y: np.ndarray, 
+                             methods: Optional[List[str]] = None) -> pd.DataFrame:
+        """
+        Get comprehensive feature importance analysis.
+        
+        Args:
+            X: Input data [n_samples, n_features]
+            y: Target values [n_samples]
+            methods: List of methods to use ['weights', 'gradients', 'permutation', 'shap']
+            
+        Returns:
+            DataFrame with feature importance scores
+        """
+        if self.model is None:
+            raise ValueError("No trained model available for feature importance analysis.")
+        
+        if self.feature_columns is None:
+            raise ValueError("Feature columns not available. Train or load a model first.")
+        
+        # Create analyzer
+        analyzer = FeatureImportanceAnalyzer(
+            self.model, 
+            self.feature_columns, 
+            torch.device(self.device)
+        )
+        
+        return analyzer.get_comprehensive_importance(X, y, methods)
+    
+    def explain_predictions(self, X: np.ndarray, driver_names: Optional[List[str]] = None,
+                          method: str = 'gradients') -> pd.DataFrame:
+        """
+        Explain individual driver predictions.
+        
+        Args:
+            X: Input data for drivers [n_drivers, n_features]
+            driver_names: Names of drivers (optional)
+            method: Method to use for explanation ('gradients' or 'shap')
+            
+        Returns:
+            DataFrame with explanations for each driver
+        """
+        if self.model is None:
+            raise ValueError("No trained model available for prediction explanation.")
+        
+        if self.feature_columns is None:
+            raise ValueError("Feature columns not available. Train or load a model first.")
+        
+        analyzer = FeatureImportanceAnalyzer(
+            self.model, 
+            self.feature_columns, 
+            torch.device(self.device)
+        )
+        
+        return analyzer.explain_prediction(X, driver_names, method)
+    
+    def get_feature_weights(self) -> Dict[str, float]:
+        """
+        Get feature importance based on first layer weights.
+        
+        Returns:
+            Dictionary mapping feature names to weight-based importance
+        """
+        if self.model is None:
+            raise ValueError("No trained model available.")
+        
+        if self.feature_columns is None:
+            raise ValueError("Feature columns not available. Train or load a model first.")
+        
+        analyzer = FeatureImportanceAnalyzer(
+            self.model, 
+            self.feature_columns, 
+            torch.device(self.device)
+        )
+        
+        return analyzer.get_weight_importance()
+    
+    def save_feature_importance_report(self, X: np.ndarray, y: np.ndarray,
+                                     output_path: str, methods: Optional[List[str]] = None):
+        """
+        Generate and save comprehensive feature importance report.
+        
+        Args:
+            X: Input data [n_samples, n_features]
+            y: Target values [n_samples]
+            output_path: Path to save report (without extension)
+            methods: Methods to include in analysis
+        """
+        if self.model is None:
+            raise ValueError("No trained model available.")
+        
+        if self.feature_columns is None:
+            raise ValueError("Feature columns not available. Train or load a model first.")
+        
+        importance_df = self.get_feature_importance(X, y, methods)
+        
+        analyzer = FeatureImportanceAnalyzer(
+            self.model, 
+            self.feature_columns, 
+            torch.device(self.device)
+        )
+        
+        analyzer.save_importance_report(importance_df, output_path)
