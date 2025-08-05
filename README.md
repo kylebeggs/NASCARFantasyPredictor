@@ -16,143 +16,171 @@
 
 ## 🎬 Overview
 
-Welcome to the ultimate AI-powered NASCAR Fantasy Predictor! 🚀 This bad boy uses cutting-edge machine learning to help you dominate your fantasy league by predicting race finishes with scary accuracy. We're talking deep learning models trained on years of racing data, real-time analytics, and enough NASCAR knowledge to make even Dale Jr. proud! 🏆
+NASCAR Fantasy Predictor is a data collection and analysis tool designed to help you make informed fantasy NASCAR decisions. It focuses on gathering historical race data from multiple sources and providing insights through statistical analysis and feature engineering. This is a human-augmented decision-making tool that combines data-driven insights with your NASCAR expertise.
 
-## ✨ Features That'll Make You Go "Boogity Boogity Boogity!"
+## ✨ Current Features
 
-- 🕷️ **Web Scraping Wizardry**: Automatically grabs race data from Racing-Reference and LapRaptor.com like a pit crew on Red Bull
-- 🧠 **Big Brain Feature Engineering**: Creates 43+ features that would make a NASA engineer jealous (speed, track history, momentum, you name it!)
-- 🔥 **PyTorch Power**: Deep learning models that are faster than Kyle Larson on a superspeedway
-- 🔄 **Auto-Updates**: Weekly data refreshes with model retraining - fresher than new tires on pit road
-- 🏁 **Track-Specific Smarts**: Knows the difference between Daytona and Dover better than your favorite NASCAR commentator
-- 💰 **Fantasy Gold**: Predictions with confidence intervals to help you win that office pool and earn bragging rights
+- 🕷️ **Data Collection**: Web scraping from LapRaptor.com for 2025 race results and speed analytics
+- 🏁 **Race Analysis**: Detailed analysis of race results with fantasy points calculations
+- 📊 **Driver Statistics**: Comprehensive driver performance metrics and historical data
+- 💰 **Fantasy Points**: DraftKings scoring system with top performer insights
+- 📈 **Feature Engineering**: Advanced statistical features for analysis
+- 📁 **Data Export**: CSV and JSON export capabilities for external analysis
+- 🎯 **Track-Specific Analysis**: Historical performance at specific tracks
 
-## 🚀 Quick Start (Let's Go Racing!)
+## 🚀 Quick Start
 
 ### 📦 Installation
 ```bash
-# Get this baby installed faster than a NASCAR pit stop!
+# Install the package in development mode with dev dependencies
 pip install -e ".[dev]"
 ```
 
-### 🏁 Initial Setup
+### 🏁 Data Collection
 ```bash
-# Download years of racing history (the good stuff!)
-nascar-predictor init --start-year 2022
+# Collect 2025 NASCAR race data from LapRaptor.com
+nascar-predictor collect
 
-# See what we're working with
-nascar-predictor status
+# Currently only 2025 data collection is supported
+nascar-predictor collect --year 2025
 ```
 
-### 🧠 Train Your AI Crew Chief
+### 📊 Data Analysis
 ```bash
-# Teach the AI everything about NASCAR racing
-nascar-predictor train
+# Analyze the latest race
+nascar-predictor analyze --date latest
+
+# Analyze a specific race date
+nascar-predictor analyze --date 2025-02-25
+
+# Analyze historical data for a specific track
+nascar-predictor analyze --track "Daytona"
 ```
 
-### 🎯 Make Some Predictions
+### 🏎️ Driver Statistics
 ```bash
-# Who's gonna win this Sunday? Let's find out!
-nascar-predictor predict
+# Get comprehensive driver statistics
+nascar-predictor driver-stats --driver "Kyle Larson"
 
-# Planning ahead for a specific race
-nascar-predictor predict --race-date 2025-07-25
+# Driver stats for a specific track
+nascar-predictor driver-stats --driver "Kyle Larson" --track "Phoenix"
 
-# Save those golden predictions
-nascar-predictor predict --output my-winning-picks.csv
+# Driver stats for a specific year
+nascar-predictor driver-stats --driver "Kyle Larson" --year 2024
 ```
 
-### 🔄 Stay Fresh with Weekly Updates
+### 📁 Data Export
 ```bash
-# Keep your model sharper than a fresh set of Goodyears
-nascar-predictor update-weekly --auto-retrain
+# Export all data to CSV
+nascar-predictor export --output all_races.csv
 
-# Grab all the 2025 race data
-nascar-predictor fetch-2025-data
+# Export specific year data
+nascar-predictor export --output 2024_races.csv --year 2024
+
+# Export as JSON format
+nascar-predictor export --output races.json --format json
 ```
 
-## 🏗️ Under the Hood (The Technical Stuff)
+## 🏗️ Architecture Overview
 
-This beast runs on a multi-component architecture that's more complex than a championship car setup:
+The system is designed for simplicity and data analysis:
 
-1. 🕸️ **Data Collection Squad**: Web scrapers that work harder than a pit crew, grabbing data from Racing-Reference and LapRaptor.com
-2. 🔧 **Feature Engineering Garage**: Creates 43+ mind-blowing features from speed metrics to track history 
-3. 🧠 **PyTorch Powerhouse**: Neural networks that think faster than you can say "checkered flag"
-4. 🎯 **Prediction Engine**: Spits out finish predictions with confidence levels that'll make you a fantasy legend
-5. 📈 **Auto-Learning**: Gets smarter every week like a veteran driver learning a new track
+1. 🕸️ **Data Collection**: Scrapes historical race results and speed analytics from LapRaptor.com
+2. 🔧 **Feature Engineering**: Creates analytical features for human interpretation and decision-making
+3. 📊 **Data Storage**: Simple CSV-based storage for easy access and manipulation
+4. 📈 **Analysis Tools**: Provides insights on driver performance, track history, and head-to-head matchups
+5. 📁 **Export Functionality**: Easy export to CSV/JSON for external analysis tools
 
-## 🎛️ What Makes This Thing Tick
+## 🎛️ Analysis Features
 
-Our AI crew chief analyzes more data than a NASCAR telemetry system:
-- 📊 **Performance Wizardry**: Average finishes, consistency scores, fantasy points galore
-- 🏁 **Track Intelligence**: Knows every bump, bank, and characteristic of each track
-- 💨 **Speed Secrets**: Green flag speed, late-run performance, total speed ratings
-- 📈 **Momentum Magic**: Recent form vs historical trends (is this driver heating up or cooling down?)
-- 🏎️ **Equipment Edge**: Manufacturer performance, team stats, all the garage secrets
-- ⏰ **Time Travel**: Rolling averages and recent form that predict the future
+The tool provides comprehensive data analysis including:
+- 📊 **Driver Performance**: Average finish, consistency scores, track-specific performance
+- 🏁 **Track History**: Historical performance patterns at specific tracks
+- 💨 **Speed Analytics**: Green flag speed, late-run performance, total speed ratings from LapRaptor
+- 📈 **Position Analysis**: Position changes, biggest movers, starting vs finishing positions
+- 💰 **Fantasy Points**: DraftKings scoring calculations and top performer identification
+- ⏰ **Recent Form**: Recent race results and performance trends
 
-## 📊 Where We Get the Good Stuff
+## 📊 Data Sources
 
-- 🏁 **Racing-Reference.info**: The holy grail of historical NASCAR data
-- ⚡ **LapRaptor.com**: Fresh 2025 race results and loop data that's hotter than asphalt in July
-- 💾 **Local CSV Storage**: Our own private database that's organized better than Hendrick Motorsports' garage
+- ⚡ **LapRaptor.com**: 2025 race results and speed analytics including green flag speed and late-run performance
+- 🏁 **NASCAR Official Site**: Official race results and statistics (scrapers available but not currently active)
+- 💾 **Local CSV Storage**: Simple file-based storage for collected data
 
-## 🛠️ Tech Stack (The Nerd Stuff)
+## 🛠️ Tech Stack
 
-- 🔥 **PyTorch**: AI framework that's more powerful than a restrictor plate-free engine
-- 🐼 **pandas/numpy**: Data crunching tools that work faster than a pit stop
-- 🕷️ **BeautifulSoup/requests**: Web scraping magic that grabs data like it's on pole position
-- 🖱️ **Click**: Command-line interface smoother than a freshly paved track
-- 🤖 **scikit-learn**: Feature preprocessing that's more precise than laser tech inspection
+- 🐼 **pandas/numpy**: Data manipulation and analysis
+- 🕷️ **BeautifulSoup/requests**: Web scraping for data collection
+- 🖱️ **Click**: Command-line interface framework
+- 📊 **tqdm**: Progress bars for data collection operations
 
-## 🗂️ Project Structure (The Garage Layout)
+## 🗂️ Project Structure
 
 ```
-nascar_fantasy_predictor/          # 🏠 Home sweet home
-├── cli.py                         # 🎤 Command center for all the magic
-├── data/                         # 📁 Data collection headquarters
-│   ├── csv_manager.py           # 📊 Data storage that never crashes
-│   ├── lapraptor_scraper.py     # 🕷️ Web scraping superhero
-│   ├── nascar_official_scraper.py # 🏁 Official NASCAR data pipeline
-│   └── csv_importer.py          # 📥 Import wizard
-├── features/                     # ⚙️ Feature engineering workshop
-│   ├── feature_engineering.py   # 🔧 The main feature factory
-│   └── fantasy_points.py        # 💰 Fantasy scoring genius
-├── models/                       # 🧠 AI brain center
-│   ├── tabular_nn.py            # 🤖 Neural network architectures
-│   └── trainer.py               # 🏋️ Model training gym
-└── prediction/                   # 🔮 Crystal ball department
-    └── predictor.py             # 🎯 The main prediction engine
+nascar_fantasy_predictor/          # Main package directory
+├── cli/                          # Command line interface
+│   └── main.py                  # CLI entry point with focused commands
+├── data/                         # Data collection and management
+│   ├── csv_manager.py           # CSV-based data storage and retrieval
+│   ├── lapraptor_scraper.py     # LapRaptor.com speed analytics scraper
+│   ├── nascar_official_scraper.py # NASCAR official site scraper
+│   ├── qualifying_scraper.py    # Qualifying results scraper
+│   └── csv_importer.py          # Data import utilities
+├── features/                     # Feature engineering for analysis
+│   ├── feature_engineering.py   # Data analysis feature creation
+│   └── fantasy_points.py        # Fantasy points calculation (DraftKings, FanDuel)
+└── utils/                        # Utility modules
+    ├── logging.py               # Centralized logging configuration
+    └── exceptions.py            # Custom exception classes
 ```
 
-## 🛠️ Development (For the Code Warriors)
+## 🛠️ Development
 
-### 🧹 Keep It Clean
+### Code Quality and Testing
 ```bash
-# Make your code prettier than a freshly waxed race car
+# Format code with Black
 black .
+
+# Sort imports with isort
 isort .
+
+# Run linting with flake8
 flake8
+
+# Type checking with mypy
 mypy nascar_fantasy_predictor/
+
+# Run tests
 pytest
 ```
 
-## 🤝 Contributing (Join the Team!)
+## 🤝 Contributing
 
-This project is a showcase of AI-assisted development magic! 🪄 While Claude did most of the heavy lifting, we'd love contributions for:
-- 📡 More data sources (the more the merrier!)
-- 🔧 Crazy new feature ideas (think outside the pit box!)
-- 🧠 Model improvements (make it even smarter!)
-- 💰 Fantasy scoring systems (help everyone win!)
+This project welcomes contributions for:
+- 📡 Additional data sources and scraping capabilities
+- 🔧 New analysis features and statistical insights
+- 📊 Enhanced visualization and reporting tools
+- 💰 Support for additional fantasy scoring systems
 
 ## 📜 License
 
-MIT License - Go wild with it! Use this as inspiration for your own AI-assisted projects! 🚀
+MIT License
 
-## 🙏 Shoutouts
+## 🙏 Acknowledgments
 
-- 🤖 **Claude (Anthropic)**: The AI co-pilot who made this whole thing possible
-- 🏁 **NASCAR**: For creating the most exciting sport on the planet
-- 📊 **Racing-Reference & LapRaptor**: For being the data heroes we needed
-- 🔥 **PyTorch Team**: For building the AI framework that powers our predictions
-- 🏆 **You**: For checking out this wild ride of AI + NASCAR!
+- 🤖 **Claude (Anthropic)**: AI assistant for code development and architecture design
+- 🏁 **NASCAR**: For creating the most exciting motorsport
+- 📊 **LapRaptor.com**: For providing comprehensive speed analytics and race data
+- 🏆 **NASCAR Fantasy Community**: For inspiring data-driven fantasy decision making
+
+## 🎯 Usage Philosophy
+
+This tool is designed to augment human decision-making, not replace it. It provides data and insights that help identify:
+
+- Drivers with strong recent form
+- Track-specific specialists  
+- Consistent performers vs high-variance drivers
+- Value plays based on starting position
+- Historical performance patterns
+
+The human user combines these insights with additional factors like weather conditions, team changes, equipment updates, driver motivations, and current point standings. This combination of data-driven insights and human judgment leads to better fantasy predictions than either approach alone.
