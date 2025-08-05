@@ -1,13 +1,14 @@
 """LapRaptor.com data scraper for NASCAR race results and loop data."""
 
+import logging
+import re
+import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Tuple
+
+import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import pandas as pd
-from datetime import datetime, timedelta
-import time
-import re
-from typing import Dict, List, Optional, Tuple
-import logging
 
 logger = logging.getLogger(__name__)
 

@@ -1,5 +1,9 @@
 # 🏁 NASCAR Fantasy Predictor 🤖
 
+![CI](https://github.com/kylebeggs/NASCARFantasyPredictor/workflows/CI/badge.svg)
+![Tests](https://github.com/kylebeggs/NASCARFantasyPredictor/workflows/Tests/badge.svg)
+![Coverage](https://github.com/kylebeggs/NASCARFantasyPredictor/workflows/Test%20Coverage/badge.svg)
+
 > **⚠️ DISCLAIMER & WARNING ⚠️**  
 > This repository is 99% written by Claude (Anthropic's AI assistant) - I just provided the NASCAR knowledge and said "make it go fast!" 🏎️💨 This is a collaborative experiment in AI-assisted development, which means:
 > 

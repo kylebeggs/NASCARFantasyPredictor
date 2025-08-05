@@ -12,21 +12,15 @@ dependencies = [
     "numpy",
     "requests",
     "beautifulsoup4",
-    "torch",
     "click",
     "tqdm",
-    "schedule",
-    "scikit-learn",
-    "joblib",
-    "shap",
-    "matplotlib",
-    "seaborn",
 ]
 requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-cov",
     "black",
     "isort",
     "flake8",
